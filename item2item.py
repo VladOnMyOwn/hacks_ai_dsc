@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.stats import logistic
 from sklearn.preprocessing import MultiLabelBinarizer
@@ -13,6 +12,7 @@ class Item2ItemRS():
         self.freq = pd.DataFrame()
         self.time_freq = pd.DataFrame()
         self.area_freq = pd.DataFrame()
+        self.most_popular = None
 
 
     def fill_freq(self, freq: pd.DataFrame):
@@ -87,11 +87,16 @@ class Item2ItemRS():
         return device_quantities
 
 
+    def __get_most_popular(self, data: pd.DataFrame):
+        return data.groupby(['item_id']).quantity.sum().sort_values(ascending=False).index[0]
+
+
     def fit(self, data: pd.DataFrame):
         self.data = data
         self.freq = self.__get_i2i_matrix()
         self.time_freq = self.__get_season_freq_matrix('local_date', self.seas_period)
         self.area_freq = self.__get_area_freq_matrix()
+        self.most_popular = self.__get_most_popular(data)
 
 
     def update(self):
@@ -125,11 +130,11 @@ class Item2ItemRS():
             basket = basket.intersection(self.freq.index.values)
         except AttributeError:
             print('Empty basket!')
-            return np.nan
+            return self.most_popular, None
 
         if len(basket) == 0:
             print('No such product!')
-            return np.nan
+            return self.most_popular, None
 
         res = pd.DataFrame(index=list(self.freq.columns))
         res['numerator'] = self.freq[list(basket)].sum(axis=1)
