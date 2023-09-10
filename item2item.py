@@ -103,19 +103,10 @@ class Item2ItemRS():
         pass
 
 
-    def __preprocess_sample(self, data: pd.Series) -> pd.DataFrame:
-
-        receipt = data.groupby('receipt_id', as_index=False).agg(
-            {'local_date': 'first', 'device_id': 'first', 'item_id': set})
-
-        return receipt
-
-
     def predict(self, sample: pd.DataFrame) -> tuple:
 
-        prep_data = self.__preprocess_sample(sample)
-        basket = prep_data.item_id.values[0]
-
+        prep_data = sample
+        basket = set(prep_data.item_id.values[0])
         if self.seas_period == self.Seasonality.periods[0]:
             sample_time_part = pd.to_datetime(prep_data.local_date.values[0]).month % 12 // 3 + 1
         elif self.seas_period == self.Seasonality.periods[1]:
@@ -124,7 +115,7 @@ class Item2ItemRS():
             sample_time_part = pd.to_datetime(prep_data.local_date.values[0]).dayofweek
         else:
             sample_time_part = pd.to_datetime(prep_data.local_date.values[0]).hour
-        device = prep_data.device_id.values[0]
+        # device = prep_data.device_id.values[0]
 
         try:
             basket = basket.intersection(self.freq.index.values)
@@ -141,7 +132,7 @@ class Item2ItemRS():
         res['denominator'] = self.freq[list(set(self.freq.keys()).difference(basket))].sum(axis=1)
         res['proba'] = res.numerator / res.T[list(basket)].T.denominator.sum()
         res['time_freq'] = self.time_freq[self.time_freq.index == int(sample_time_part)].T.squeeze()
-        res['area_freq'] = self.area_freq[self.area_freq.index == int(device)].T.squeeze()
+        # res['area_freq'] = self.area_freq[self.area_freq.index == int(device)].T.squeeze()
         res['weighted_proba'] =  res.proba * logistic.cdf(res.time_freq)
         res['proba_calibr'] = logistic.cdf(res.weighted_proba)
         res = res.sort_values(by='proba_calibr', ascending=False)
